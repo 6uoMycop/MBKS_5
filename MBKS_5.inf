@@ -7,10 +7,10 @@ Signature   = "$Windows NT$"
 ; TODO - Change the Class and ClassGuid to match the Load Order Group value, see https://msdn.microsoft.com/en-us/windows/hardware/gg462963
 ; Class       = "ActivityMonitor"                         ;This is determined by the work this filter driver does
 ; ClassGuid   = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}    ;This value is determined by the Load Order Group value
-Class = "_TODO_Change_Class_appropriately_"
-ClassGuid = {_TODO_Change_ClassGuid_appropriately_}
+Class = "ActivityMonitor"
+ClassGuid = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
 Provider    = %ManufacturerName%
-DriverVer   = 
+DriverVer   = 1.0.0.0
 CatalogFile = MBKS_5.cat
 
 [DestinationDirs]
@@ -52,7 +52,7 @@ StartType        = 3                            ;SERVICE_DEMAND_START
 ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
 ; TODO - Change the Load Order Group value
 ; LoadOrderGroup = "FSFilter Activity Monitor"
-LoadOrderGroup = "_TODO_Change_LoadOrderGroup_appropriately_"
+LoadOrderGroup   = "FSFilter Open File"
 AddReg           = MiniFilter.AddRegistry
 
 ;
@@ -85,9 +85,9 @@ MBKS_5.sys = 1,,
 
 [Strings]
 ; TODO - Add your manufacturer
-ManufacturerName        = "Template"
-ServiceDescription      = "MBKS_5 Mini-Filter Driver"
-ServiceName             = "MBKS_5"
+ManufacturerName        = "Petushkov Arkadii"
+ServiceDescription      = "MBKS 5 - HRU Model"
+ServiceName             = "Mini-Filter Driver 3"
 DriverName              = "MBKS_5"
 DiskId1                 = "MBKS_5 Device Installation Disk"
 
@@ -95,5 +95,5 @@ DiskId1                 = "MBKS_5 Device Installation Disk"
 DefaultInstance         = "MBKS_5 Instance"
 Instance1.Name          = "MBKS_5 Instance"
 ; TODO - Change the altitude value, see https://msdn.microsoft.com/en-us/windows/hardware/drivers/ifs/load-order-groups-and-altitudes-for-minifilter-drivers
-Instance1.Altitude       = "_TODO_Change_Altitude_appropriately_"
+Instance1.Altitude       = "109998" ;420001 109998
 Instance1.Flags         = 0x0              ; Allow all attachments

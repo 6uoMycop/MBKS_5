@@ -17,6 +17,9 @@ Environment:
 #include <fltKernel.h>
 #include <dontuse.h>
 
+#include <string.h>
+#include <wchar.h>
+
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
 
@@ -33,6 +36,32 @@ ULONG gTraceFlags = 0;
     (FlagOn(gTraceFlags,(_dbgLevel)) ?              \
         DbgPrint _string :                          \
         ((int)0))
+
+#define ACCESS_MATRIX_SIZE 10
+#define AM_FIELD_SIZE      128
+
+struct Rules
+{
+    wchar_t wcProcessName[AM_FIELD_SIZE];
+    wchar_t wcFileName   [AM_FIELD_SIZE];
+    INT     iAccessType;                  // IRP_MJ_READ / IRP_MJ_WRITE
+} AccessMatrix[ACCESS_MATRIX_SIZE];
+
+INT iRulesNumber = 0;
+
+typedef NTSTATUS(*QUERY_INFO_PROCESS) (
+    __in HANDLE ProcessHandle,
+    __in PROCESSINFOCLASS ProcessInformationClass,
+    __out_bcount(ProcessInformationLength) PVOID ProcessInformation,
+    __in ULONG ProcessInformationLength,
+    __out_opt PULONG ReturnLength
+    );
+
+QUERY_INFO_PROCESS ZwQueryInformationProcess;
+
+const wchar_t cwcVolume    [128] = L"\\Device\\HarddiskVolume2";
+const wchar_t cwcParentDir [128] = L"\\TestFolder";
+const wchar_t cwcConfigPath[128] = L"\\Device\\HarddiskVolume2\\conf.txt";
 
 /*************************************************************************
     Prototypes
@@ -134,203 +163,15 @@ EXTERN_C_END
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
 
-#if 0 // TODO - List all of the requests to filter.
-    { IRP_MJ_CREATE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_CREATE_NAMED_PIPE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_CLOSE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
     { IRP_MJ_READ,
       0,
       MBKS5PreOperation,
       MBKS5PostOperation },
-
+    
     { IRP_MJ_WRITE,
       0,
       MBKS5PreOperation,
       MBKS5PostOperation },
-
-    { IRP_MJ_QUERY_INFORMATION,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_SET_INFORMATION,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_QUERY_EA,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_SET_EA,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_FLUSH_BUFFERS,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_QUERY_VOLUME_INFORMATION,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_SET_VOLUME_INFORMATION,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_DIRECTORY_CONTROL,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_FILE_SYSTEM_CONTROL,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_DEVICE_CONTROL,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_INTERNAL_DEVICE_CONTROL,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_SHUTDOWN,
-      0,
-      MBKS5PreOperationNoPostOperation,
-      NULL },                               //post operations not supported
-
-    { IRP_MJ_LOCK_CONTROL,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_CLEANUP,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_CREATE_MAILSLOT,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_QUERY_SECURITY,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_SET_SECURITY,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_QUERY_QUOTA,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_SET_QUOTA,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_PNP,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_ACQUIRE_FOR_SECTION_SYNCHRONIZATION,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_RELEASE_FOR_SECTION_SYNCHRONIZATION,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_ACQUIRE_FOR_MOD_WRITE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_RELEASE_FOR_MOD_WRITE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_ACQUIRE_FOR_CC_FLUSH,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_RELEASE_FOR_CC_FLUSH,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_FAST_IO_CHECK_IF_POSSIBLE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_NETWORK_QUERY_OPEN,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_MDL_READ,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_MDL_READ_COMPLETE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_PREPARE_MDL_WRITE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_MDL_WRITE_COMPLETE,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_VOLUME_MOUNT,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-    { IRP_MJ_VOLUME_DISMOUNT,
-      0,
-      MBKS5PreOperation,
-      MBKS5PostOperation },
-
-#endif // TODO
 
     { IRP_MJ_OPERATION_END }
 };
@@ -348,12 +189,12 @@ CONST FLT_REGISTRATION FilterRegistration = {
     NULL,                               //  Context
     Callbacks,                          //  Operation callbacks
 
-    MBKS5Unload,                           //  MiniFilterUnload
+    MBKS5Unload,                        //  MiniFilterUnload
 
-    MBKS5InstanceSetup,                    //  InstanceSetup
-    MBKS5InstanceQueryTeardown,            //  InstanceQueryTeardown
-    MBKS5InstanceTeardownStart,            //  InstanceTeardownStart
-    MBKS5InstanceTeardownComplete,         //  InstanceTeardownComplete
+    MBKS5InstanceSetup,                 //  InstanceSetup
+    MBKS5InstanceQueryTeardown,         //  InstanceQueryTeardown
+    MBKS5InstanceTeardownStart,         //  InstanceTeardownStart
+    MBKS5InstanceTeardownComplete,      //  InstanceTeardownComplete
 
     NULL,                               //  GenerateFileName
     NULL,                               //  GenerateDestinationFileName
@@ -619,14 +460,270 @@ Return Value:
 
 
 /*************************************************************************
+    My routines.
+*************************************************************************/
+
+NTSTATUS GetProcessImageName(PEPROCESS eProcess, PUNICODE_STRING* ProcessImageName)
+{
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    ULONG returnedLength;
+    HANDLE hProcess = NULL;
+
+    PAGED_CODE(); // this eliminates the possibility of the IDLE Thread/Process
+
+    if (eProcess == NULL)
+    {
+        return STATUS_INVALID_PARAMETER_1;
+    }
+
+    status = ObOpenObjectByPointer(eProcess, 0, NULL, 0, 0, KernelMode, &hProcess);
+    if (!NT_SUCCESS(status))
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ObOpenObjectByPointer Failed: %08x\n", status);
+        ZwClose(hProcess);
+        return status;
+    }
+
+    if (ZwQueryInformationProcess == NULL)
+    {
+        UNICODE_STRING routineName = RTL_CONSTANT_STRING(L"ZwQueryInformationProcess");
+
+        ZwQueryInformationProcess = (QUERY_INFO_PROCESS)MmGetSystemRoutineAddress(&routineName);
+
+        if (ZwQueryInformationProcess == NULL)
+        {
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Cannot resolve ZwQueryInformationProcess\n");
+            status = STATUS_UNSUCCESSFUL;
+            ZwClose(hProcess);
+            return status;
+        }
+    }
+
+    /* Query the actual size of the process path */
+    status = ZwQueryInformationProcess(
+        hProcess,
+        ProcessImageFileName,
+        NULL, // buffer
+        0,    // buffer size
+        &returnedLength
+    );
+
+    if (STATUS_INFO_LENGTH_MISMATCH != status)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ZwQueryInformationProcess status = %x\n", status);
+        ZwClose(hProcess);
+        return status;
+    }
+
+    *ProcessImageName = ExAllocatePoolWithTag(NonPagedPoolNx, returnedLength, '2gat');
+
+    if (ProcessImageName == NULL)
+    {
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        ZwClose(hProcess);
+        return status;
+    }
+
+    /* Retrieve the process path from the handle to the process */
+    status = ZwQueryInformationProcess(
+        hProcess,
+        ProcessImageFileName,
+        *ProcessImageName,
+        returnedLength,
+        &returnedLength
+    );
+
+    if (!NT_SUCCESS(status))
+    {
+        ExFreePoolWithTag(*ProcessImageName, '2gat');
+    }
+    
+    ZwClose(hProcess);
+    return status;
+}
+
+#define  BUFFER_SIZE 512
+
+NTSTATUS
+ReadConfiguration()
+{
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ParseFile entered\n");
+
+    UNICODE_STRING uniName;
+    OBJECT_ATTRIBUTES objAttr;
+
+    HANDLE hHandle;
+    NTSTATUS ntstatus;
+    IO_STATUS_BLOCK ioStatusBlock;
+
+    CHAR buffer[BUFFER_SIZE] = { 0 };
+
+    PCHAR pNext, pContext;
+    LARGE_INTEGER byteOffset;
+
+    iRulesNumber = 0;
+
+    RtlInitUnicodeString(&uniName, cwcConfigPath);
+
+    InitializeObjectAttributes(
+        &objAttr,
+        &uniName,
+        OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
+        NULL,
+        NULL
+    );
+
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL)
+    {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+
+    ntstatus = ZwCreateFile(
+        &hHandle,
+        GENERIC_READ,
+        &objAttr,
+        &ioStatusBlock,
+        NULL,
+        FILE_ATTRIBUTE_NORMAL,
+        0,
+        FILE_OPEN,
+        FILE_SYNCHRONOUS_IO_NONALERT,
+        NULL,
+        0
+    );
+
+    if (!NT_SUCCESS(ntstatus))
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ZwCreateFile error\n");
+        return -1;
+    }
+
+    byteOffset.LowPart = byteOffset.HighPart = 0;
+
+    ntstatus = ZwReadFile(
+        hHandle,
+        NULL,
+        NULL,
+        NULL,
+        &ioStatusBlock,
+        buffer,
+        BUFFER_SIZE,
+        &byteOffset,
+        NULL
+    );
+
+    if (!NT_SUCCESS(ntstatus))
+    {
+        ZwClose(hHandle);
+        return 0;
+    }
+
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "buffer - %s\n", buffer);
+
+    pNext = strtok_s(buffer, " ", &pContext);
+
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str - %s\n", pNext);
+
+    while (pNext != NULL)
+    {
+        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str 1 - %s\n", pNext);
+        if (pNext != NULL)
+        {
+            swprintf_s(AccessMatrix[iRulesNumber].wcProcessName, AM_FIELD_SIZE, L"%hs", pNext);
+            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws - ", AccessMatrix[iRulesNumber].wcProcessName);
+        }
+
+        pNext = strtok_s(NULL, " ", &pContext);
+        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str 2 - %s\n", pNext);
+        if (pNext != NULL)
+        {
+            swprintf_s(AccessMatrix[iRulesNumber].wcFileName, AM_FIELD_SIZE, L"%hs", pNext);
+            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws - ", AccessMatrix[iRulesNumber].wcFileName);
+        }
+
+        pNext = strtok_s(NULL, "\n\0", &pContext);
+        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str 3 - %s\n", pNext);
+        if (pNext != NULL)
+        {
+            if (pNext[0] == 'r')
+            {
+                AccessMatrix[iRulesNumber].iAccessType = IRP_MJ_READ;
+            }
+            else if (pNext[0] == 'w')
+            {
+                AccessMatrix[iRulesNumber].iAccessType = IRP_MJ_WRITE;
+            }
+            else
+            {
+                //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "type error: %c\n", pNext[0]);
+                iRulesNumber = 0;
+                return -1;
+            }
+            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%d\n", AccessMatrix[iRulesNumber].iAccessType);
+
+        }
+        pNext = strtok_s(NULL, " ", &pContext);
+        iRulesNumber++;
+    }
+
+    ZwClose(hHandle);
+    return 0;
+}
+
+NTSTATUS
+FindRule(PUNICODE_STRING processName, PUNICODE_STRING targetName, INT type)
+{
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "FindRule entered\n");
+
+    //NTSTATUS status;
+
+    PWCHAR pCurTarget = targetName->Buffer;
+    PWCHAR pCurProcess = processName->Buffer;
+
+    INT i;
+    for (i = 0; i < AM_FIELD_SIZE - 1; i++)
+    {
+        if (targetName->Buffer[i] == '\\')
+        {
+            pCurTarget = &targetName->Buffer[i + 1];
+        }
+        if (processName->Buffer[i] == '\\')
+        {
+            pCurProcess = &processName->Buffer[i + 1];
+        }
+    }
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "processName: %ws\n", processName->Buffer);
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Input:\t%ws -> %ws : %d\n", pCurProcess, pCurTarget, type);
+    for (i = 0; i < iRulesNumber; i++)
+    {
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Rule %d:\t%ws -> %ws : %d\n", i + 1, AccessMatrix[i].wcProcessName, AccessMatrix[i].wcFileName, AccessMatrix[i].iAccessType);
+
+        if (wcsncmp(pCurProcess, AccessMatrix[i].wcProcessName, AM_FIELD_SIZE) == 0 &&
+            wcsncmp(pCurTarget,  AccessMatrix[i].wcFileName,    AM_FIELD_SIZE) == 0 &&
+            AccessMatrix[i].iAccessType                                        == type)
+        {
+            DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Rule exists\n");
+            return 1;
+        }
+    }
+
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Rule does not exist\n");
+
+    return 0;
+}
+
+
+/*************************************************************************
     MiniFilter callback routines.
 *************************************************************************/
 FLT_PREOP_CALLBACK_STATUS
-MBKS5PreOperation (
+MBKS5PreOperation(
     _Inout_ PFLT_CALLBACK_DATA Data,
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
-    _Flt_CompletionContext_Outptr_ PVOID *CompletionContext
-    )
+    _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
+)
 /*++
 
 Routine Description:
@@ -652,40 +749,95 @@ Return Value:
 
 --*/
 {
+    PUNICODE_STRING wcProcess = NULL;
+
     NTSTATUS status;
 
-    UNREFERENCED_PARAMETER( FltObjects );
-    UNREFERENCED_PARAMETER( CompletionContext );
+    UNREFERENCED_PARAMETER(FltObjects);
+    UNREFERENCED_PARAMETER(CompletionContext);
 
-    PT_DBG_PRINT( PTDBG_TRACE_ROUTINES,
-                  ("MBKS5!MBKS5PreOperation: Entered\n") );
+    //PT_DBG_PRINT(PTDBG_TRACE_ROUTINES, ("MBKS5!MBKS5PreOperation: Entered\n"));
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DBG MBKS5!MBKS5PreOperation: Entered\n");
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DBG MBKS5!MBKS5PreOperation: Entered\n");
 
+    PFLT_FILE_NAME_INFORMATION FileNameInformation;
+
+    if (!NT_SUCCESS(FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &FileNameInformation)))
+    {
+        return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+    }
+
+    if (!NT_SUCCESS(FltParseFileNameInformation(FileNameInformation)))
+    {
+        FltReleaseFileNameInformation(FileNameInformation);
+        return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+    }
+
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "volume - %ws\n", FileNameInformation->Volume.Buffer);
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws vol - %ws\n", (wcsncmp(FileNameInformation->Volume.Buffer, L"\\Device\\HarddiskVolume2", wcslen(L"\\Device\\HarddiskVolume2")))?L"Y":L"N", L"\\Device\\HarddiskVolume2");
     //
-    //  See if this is an operation we would like the operation status
-    //  for.  If so request it.
-    //
-    //  NOTE: most filters do NOT need to do this.  You only need to make
-    //        this call if, for example, you need to know if the oplock was
-    //        actually granted.
-    //
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "parentdir - %ws\n", FileNameInformation->ParentDir.Buffer);
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws par - %ws\n", (wcsncmp(FileNameInformation->ParentDir.Buffer, L"\\TestFolder", wcslen(L"\\TestFolder")))? L"Y" : L"N", L"\\TestFolder");
 
-    if (MBKS5DoRequestOperationStatus( Data )) {
 
-        status = FltRequestOperationStatusCallback( Data,
-                                                    MBKS5OperationStatusCallback,
-                                                    (PVOID)(++OperationStatusCtx) );
-        if (!NT_SUCCESS(status)) {
+    if (FileNameInformation->Volume.Length != 0 &&
+        FileNameInformation->ParentDir.Length != 0 &&
+        FileNameInformation->FinalComponent.Length != 0 &&
+        !wcsncmp(FileNameInformation->Volume.Buffer, cwcVolume, wcslen(cwcVolume)) &&
+        !wcsncmp(FileNameInformation->ParentDir.Buffer, cwcParentDir, wcslen(cwcParentDir))
+        )
+    {
+        status = GetProcessImageName(IoThreadToProcess(Data->Thread), &wcProcess);
+        if (!NT_SUCCESS(status))
+        {
+            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "not succeed ProcessName = %ws\n", wcProcess->Buffer);
+            return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+        }
 
-            PT_DBG_PRINT( PTDBG_TRACE_OPERATION_STATUS,
-                          ("MBKS5!MBKS5PreOperation: FltRequestOperationStatusCallback Failed, status=%08x\n",
-                           status) );
+        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ProcessName = %ws\n", wcProcess->Buffer);
+
+        if (NT_SUCCESS(status) && wcProcess)
+        {
+            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MajorFunction = %d\n", Data->Iopb->MajorFunction);
+
+            status = ReadConfiguration();
+            if (!NT_SUCCESS(status))
+            {
+                DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Configuration file not present - ACCESS GRANTED\n");
+                return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+            }
+
+            if (FindRule(wcProcess, &FileNameInformation->FinalComponent, Data->Iopb->MajorFunction) == 0)
+            {
+                DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ACCESS DENIED\n");
+                Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                return FLT_PREOP_COMPLETE;
+            }
+
+            //if (Data->Iopb->MajorFunction == IRP_MJ_READ)
+            //{
+            //    if (FindRule(wcProcess, &FileNameInformation->FinalComponent, IRP_MJ_READ) == 0)
+            //    {
+            //        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Read blocked\n");
+            //        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+            //        return FLT_PREOP_COMPLETE;
+            //    }
+            //}
+            //if (Data->Iopb->MajorFunction == IRP_MJ_WRITE)
+            //{
+            //    if (FindRule(wcProcess, &FileNameInformation->FinalComponent, IRP_MJ_WRITE) == 0)
+            //    {
+            //        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Write blocked\n");
+            //        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+            //        return FLT_PREOP_COMPLETE;
+            //    }
+            //}
         }
     }
 
-    // This template code does not do anything with the callbackData, but
-    // rather returns FLT_PREOP_SUCCESS_WITH_CALLBACK.
-    // This passes the request down to the next miniFilter in the chain.
+    FltReleaseFileNameInformation(FileNameInformation);
 
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ACCESS GRANTED\n");
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
