@@ -681,24 +681,27 @@ FindRule(PUNICODE_STRING processName, PUNICODE_STRING targetName, INT type)
     PWCHAR pCurProcess = processName->Buffer;
 
     INT i;
-    for (i = 0; i < AM_FIELD_SIZE - 1; i++)
+    for (i = 0; targetName->Buffer[i] != L'\0' && i < AM_FIELD_SIZE - 1; i++)
     {
-        if (targetName->Buffer[i] == '\\')
+        if (targetName->Buffer[i] == L'\\')
         {
             pCurTarget = &targetName->Buffer[i + 1];
         }
-        if (processName->Buffer[i] == '\\')
+    }
+    for (i = 0;  processName->Buffer[i] != L'\0' && i < AM_FIELD_SIZE - 1; i++)
+    {
+        if (processName->Buffer[i] == L'\\')
         {
             pCurProcess = &processName->Buffer[i + 1];
         }
     }
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "processName: %ws\n", processName->Buffer);
+    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "processName: %ws\n", processName->Buffer);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Input:\t%ws -> %ws : %d\n", pCurProcess, pCurTarget, type);
+    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "TRY:    %ws -> %ws : %ws\n", pCurProcess, pCurTarget, (type == IRP_MJ_READ) ? L"r" : L"w");
     for (i = 0; i < iRulesNumber; i++)
     {
-        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Rule %d:\t%ws -> %ws : %d\n", i + 1, AccessMatrix[i].wcProcessName, AccessMatrix[i].wcFileName, AccessMatrix[i].iAccessType);
+        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Rule %d:\t%ws -> %ws : %ws\n", i + 1, AccessMatrix[i].wcProcessName, AccessMatrix[i].wcFileName, (AccessMatrix[i].iAccessType == IRP_MJ_READ) ? L"r" : L"w");
 
         if (wcsncmp(pCurProcess, AccessMatrix[i].wcProcessName, AM_FIELD_SIZE) == 0 &&
             wcsncmp(pCurTarget,  AccessMatrix[i].wcFileName,    AM_FIELD_SIZE) == 0 &&
@@ -813,6 +816,10 @@ Return Value:
                 Data->IoStatus.Status = STATUS_ACCESS_DENIED;
                 return FLT_PREOP_COMPLETE;
             }
+            else
+            {
+                DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ACCESS GRANTED\n");
+            }
 
             //if (Data->Iopb->MajorFunction == IRP_MJ_READ)
             //{
@@ -837,7 +844,6 @@ Return Value:
 
     FltReleaseFileNameInformation(FileNameInformation);
 
-    DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ACCESS GRANTED\n");
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
 
