@@ -533,7 +533,7 @@ NTSTATUS GetProcessImageName(PEPROCESS eProcess, PUNICODE_STRING* ProcessImageNa
         &returnedLength
     );
 
-    if (!NT_SUCCESS(status))
+    if (!NT_SUCCESS(status) && ProcessImageName != NULL)
     {
         ExFreePoolWithTag(*ProcessImageName, '2gat');
     }
@@ -547,8 +547,6 @@ NTSTATUS GetProcessImageName(PEPROCESS eProcess, PUNICODE_STRING* ProcessImageNa
 NTSTATUS
 ReadConfiguration()
 {
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ParseFile entered\n");
-
     UNICODE_STRING uniName;
     OBJECT_ATTRIBUTES objAttr;
 
@@ -558,7 +556,7 @@ ReadConfiguration()
 
     CHAR buffer[BUFFER_SIZE] = { 0 };
 
-    PCHAR pNext, pContext;
+    PCHAR pNext = NULL, pContext = NULL;
     LARGE_INTEGER byteOffset;
 
     iRulesNumber = 0;
@@ -618,31 +616,21 @@ ReadConfiguration()
         return 0;
     }
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "buffer - %s\n", buffer);
-
     pNext = strtok_s(buffer, " ", &pContext);
-
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str - %s\n", pNext);
-
     while (pNext != NULL)
     {
-        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str 1 - %s\n", pNext);
         if (pNext != NULL)
         {
             swprintf_s(AccessMatrix[iRulesNumber].wcProcessName, AM_FIELD_SIZE, L"%hs", pNext);
-            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws - ", AccessMatrix[iRulesNumber].wcProcessName);
         }
 
         pNext = strtok_s(NULL, " ", &pContext);
-        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str 2 - %s\n", pNext);
         if (pNext != NULL)
         {
             swprintf_s(AccessMatrix[iRulesNumber].wcFileName, AM_FIELD_SIZE, L"%hs", pNext);
-            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws - ", AccessMatrix[iRulesNumber].wcFileName);
         }
 
         pNext = strtok_s(NULL, "\n\0", &pContext);
-        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "next str 3 - %s\n", pNext);
         if (pNext != NULL)
         {
             if (pNext[0] == 'r')
@@ -655,12 +643,9 @@ ReadConfiguration()
             }
             else
             {
-                //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "type error: %c\n", pNext[0]);
                 iRulesNumber = 0;
                 return -1;
             }
-            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%d\n", AccessMatrix[iRulesNumber].iAccessType);
-
         }
         pNext = strtok_s(NULL, " ", &pContext);
         iRulesNumber++;
@@ -671,12 +656,8 @@ ReadConfiguration()
 }
 
 NTSTATUS
-FindRule(PUNICODE_STRING processName, PUNICODE_STRING targetName, INT type)
+CheckAccess(PUNICODE_STRING processName, PUNICODE_STRING targetName, INT type)
 {
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "FindRule entered\n");
-
-    //NTSTATUS status;
-
     PWCHAR pCurTarget = targetName->Buffer;
     PWCHAR pCurProcess = processName->Buffer;
 
@@ -696,8 +677,6 @@ FindRule(PUNICODE_STRING processName, PUNICODE_STRING targetName, INT type)
         }
     }
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "processName: %ws\n", processName->Buffer);
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "TRY:    %ws -> %ws : %ws\n", pCurProcess, pCurTarget, (type == IRP_MJ_READ) ? L"r" : L"w");
     for (i = 0; i < iRulesNumber; i++)
     {
@@ -711,9 +690,7 @@ FindRule(PUNICODE_STRING processName, PUNICODE_STRING targetName, INT type)
             return 1;
         }
     }
-
     DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Rule does not exist\n");
-
     return 0;
 }
 
@@ -759,10 +736,6 @@ Return Value:
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(CompletionContext);
 
-    //PT_DBG_PRINT(PTDBG_TRACE_ROUTINES, ("MBKS5!MBKS5PreOperation: Entered\n"));
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DBG MBKS5!MBKS5PreOperation: Entered\n");
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "DBG MBKS5!MBKS5PreOperation: Entered\n");
-
     PFLT_FILE_NAME_INFORMATION FileNameInformation;
 
     if (!NT_SUCCESS(FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &FileNameInformation)))
@@ -776,12 +749,6 @@ Return Value:
         return FLT_PREOP_SUCCESS_WITH_CALLBACK;
     }
 
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "volume - %ws\n", FileNameInformation->Volume.Buffer);
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws vol - %ws\n", (wcsncmp(FileNameInformation->Volume.Buffer, L"\\Device\\HarddiskVolume2", wcslen(L"\\Device\\HarddiskVolume2")))?L"Y":L"N", L"\\Device\\HarddiskVolume2");
-    //
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "parentdir - %ws\n", FileNameInformation->ParentDir.Buffer);
-    //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "%ws par - %ws\n", (wcsncmp(FileNameInformation->ParentDir.Buffer, L"\\TestFolder", wcslen(L"\\TestFolder")))? L"Y" : L"N", L"\\TestFolder");
-
 
     if (FileNameInformation->Volume.Length != 0 &&
         FileNameInformation->ParentDir.Length != 0 &&
@@ -793,55 +760,32 @@ Return Value:
         status = GetProcessImageName(IoThreadToProcess(Data->Thread), &wcProcess);
         if (!NT_SUCCESS(status))
         {
-            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "not succeed ProcessName = %ws\n", wcProcess->Buffer);
             return FLT_PREOP_SUCCESS_WITH_CALLBACK;
         }
 
-        //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ProcessName = %ws\n", wcProcess->Buffer);
-
         if (NT_SUCCESS(status) && wcProcess)
         {
-            //DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "MajorFunction = %d\n", Data->Iopb->MajorFunction);
-
             status = ReadConfiguration();
             if (!NT_SUCCESS(status))
             {
                 DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Configuration file not present - ACCESS GRANTED\n");
+                FltReleaseFileNameInformation(FileNameInformation);
                 return FLT_PREOP_SUCCESS_WITH_CALLBACK;
             }
 
-            if (FindRule(wcProcess, &FileNameInformation->FinalComponent, Data->Iopb->MajorFunction) == 0)
+            if (CheckAccess(wcProcess, &FileNameInformation->FinalComponent, Data->Iopb->MajorFunction) == 0)
             {
                 DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ACCESS DENIED\n");
                 Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+                FltReleaseFileNameInformation(FileNameInformation);
                 return FLT_PREOP_COMPLETE;
             }
             else
             {
                 DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "ACCESS GRANTED\n");
             }
-
-            //if (Data->Iopb->MajorFunction == IRP_MJ_READ)
-            //{
-            //    if (FindRule(wcProcess, &FileNameInformation->FinalComponent, IRP_MJ_READ) == 0)
-            //    {
-            //        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Read blocked\n");
-            //        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-            //        return FLT_PREOP_COMPLETE;
-            //    }
-            //}
-            //if (Data->Iopb->MajorFunction == IRP_MJ_WRITE)
-            //{
-            //    if (FindRule(wcProcess, &FileNameInformation->FinalComponent, IRP_MJ_WRITE) == 0)
-            //    {
-            //        DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, "Write blocked\n");
-            //        Data->IoStatus.Status = STATUS_ACCESS_DENIED;
-            //        return FLT_PREOP_COMPLETE;
-            //    }
-            //}
         }
     }
-
     FltReleaseFileNameInformation(FileNameInformation);
 
     return FLT_PREOP_SUCCESS_WITH_CALLBACK;
